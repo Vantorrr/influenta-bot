@@ -180,8 +180,8 @@ export async function searchBloggers(params: { category?: string, maxPrice?: num
       category: row.categories,
       price: row.pricePerPost,
       subscribers: row.subscribersCount,
-      // Пробуем шортнейм 'influenta' (часто совпадает с именем бота)
-      link: `https://t.me/influenta_bot/influenta?startapp=blogger_${row.id}`
+      // Пробуем шортнейм 'app' (стандартный)
+      link: `https://t.me/influenta_bot/app?startapp=blogger_${row.id}`
     }))
   } catch (err) {
     console.error('Ошибка поиска блогеров:', err)
