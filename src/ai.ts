@@ -15,7 +15,11 @@ if (config.openaiApiKey) {
   })
 }
 
-const conversationHistory = new Map<number, Array<{ role: 'user' | 'assistant' | 'tool' | 'function', content: string | null, tool_calls?: any[] }>>()
+const conversationHistory = new Map<number, Array<{ role: 'user' | 'assistant' | 'tool' | 'function', content: string | null, tool_calls?: any[], tool_call_id?: string }>>()
+
+export function clearHistory(userId: number) {
+  conversationHistory.delete(userId)
+}
 
 export async function getAIResponse(userId: number, userMessage: string): Promise<string> {
   if (!openai) {
