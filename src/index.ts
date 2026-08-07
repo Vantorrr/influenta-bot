@@ -1,7 +1,12 @@
+import dns from 'dns'
 import { Telegraf, Markup, Context } from 'telegraf'
 import config from './config'
 import { getFAQ, createTicket } from './database'
 import { getAIResponse, clearHistory } from './ai'
+
+// В контейнерах Railway IPv6-маршрута к api.telegram.org может не быть,
+// и запросы висят до ETIMEDOUT. Принудительно предпочитаем IPv4.
+dns.setDefaultResultOrder('ipv4first')
 
 console.log('🚀 Запуск Support Bot...')
 console.log(`📱 Bot Token: ${config.botToken.substring(0, 10)}...`)
@@ -379,24 +384,41 @@ bot.action('noop', (ctx) => ctx.answerCbQuery())
 // Запуск бота
 console.log('🔌 Подключаемся к Telegram API...')
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
 ;(async () => {
-  try {
-    // Проверяем токен
-    const me = await bot.telegram.getMe()
-    console.log(`✅ Токен валиден! Бот: @${me.username}`)
-    
-    // Запускаем бота
-    await bot.launch({
-      dropPendingUpdates: true, // Игнорировать старые сообщения
-    })
-    
-    console.log('🤖 Support bot запущен!')
-    console.log(`📱 Бот: @${me.username}`)
-    console.log(`👥 Админы: ${config.adminIds.join(', ')}`)
-    console.log('✅ Бот готов к работе!')
-  } catch (err) {
-    console.error('❌ Ошибка запуска бота:', err)
-    process.exit(1)
+  // Сетевые сбои (ETIMEDOUT к api.telegram.org) бывают транзиентными,
+  // поэтому не падаем с первой попытки, а повторяем с нарастающей паузой.
+  const maxAttempts = 10
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      // Проверяем токен
+      const me = await bot.telegram.getMe()
+      console.log(`✅ Токен валиден! Бот: @${me.username}`)
+
+      // Запускаем бота
+      await bot.launch({
+        dropPendingUpdates: true, // Игнорировать старые сообщения
+      })
+
+      console.log('🤖 Support bot запущен!')
+      console.log(`📱 Бот: @${me.username}`)
+      console.log(`👥 Админы: ${config.adminIds.join(', ')}`)
+      console.log('✅ Бот готов к работе!')
+      return
+    } catch (err) {
+      const delayMs = Math.min(30_000, 2_000 * attempt)
+      console.error(`❌ Попытка ${attempt}/${maxAttempts} не удалась:`, err)
+
+      if (attempt === maxAttempts) {
+        console.error('❌ Не удалось запустить бота после всех попыток')
+        process.exit(1)
+      }
+
+      console.log(`⏳ Повтор через ${delayMs / 1000} с...`)
+      await sleep(delayMs)
+    }
   }
 })()
 
